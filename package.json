@@ -1,0 +1,6 @@
+{
+  "name": "football-app",
+  "version": "1.0.0",
+  "description": "Analisador de Partidas — frontend + backend completo na Vercel",
+  "private": true
+}

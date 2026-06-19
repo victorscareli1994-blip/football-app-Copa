@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisador de Partidas</title>
+<style>
+  :root {
+    --bg:#07100A; --surface:#0E1A12; --card:#121F16; --border:#1C2E20;
+    --green:#00D46A; --green-dim:#00A854; --green-glow:rgba(0,212,106,0.12);
+    --amber:#FFB300; --red:#F44336; --text:#E2F0E7; --text-dim:#7A9E86; --text-muted:#3D5C45;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+    font-family:'Inter',system-ui,sans-serif; padding-bottom:60px;
+  }
+  .header {
+    background:linear-gradient(180deg,#0B1A10 0%,var(--bg) 100%);
+    border-bottom:1px solid var(--border); padding:20px 16px; text-align:center;
+  }
+  .badge {
+    display:inline-flex; align-items:center; gap:6px; background:#0B2A14;
+    border:1px solid #1A5C2A; color:var(--green); font-size:10px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; padding:4px 12px; border-radius:20px; margin-bottom:10px;
+  }
+  h1 { font-size:clamp(20px,5vw,30px); font-weight:900; margin:0 0 4px; letter-spacing:-0.5px; }
+  .sub { color:var(--text-dim); font-size:12px; margin:0; }
+  .wrap { max-width:720px; margin:0 auto; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-top:20px; }
+  .card-head {
+    background:linear-gradient(135deg,#0B2214,#091609); border-bottom:1px solid var(--border);
+    padding:14px 18px; display:flex; align-items:center; gap:10px;
+  }
+  .card-head-title { font-weight:700; font-size:13px; color:var(--green); }
+  .card-body { padding:18px; }
+  label.field-label {
+    display:block; font-size:10px; font-weight:700; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--text-dim); margin-bottom:6px;
+  }
+  input, select {
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    color:var(--text); font-size:15px; font-weight:600; padding:13px 14px; outline:none;
+    width:100%; transition:border-color .2s; font-family:inherit;
+  }
+  select { font-size:13px; cursor:pointer; }
+  input:focus, select:focus { border-color:var(--green); box-shadow:0 0 0 2px var(--green-glow); }
+  .teams-row { display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:flex-end; }
+  .vs-chip {
+    background:#0B2214; border:1px solid #1A5C2A; color:var(--green); font-weight:900;
+    font-size:12px; padding:10px 12px; border-radius:8px; text-align:center; margin-top:18px; flex-shrink:0;
+  }
+  .search-row { display:flex; gap:6px; }
+  .btn-outline {
+    background:transparent; border:1px solid #1A5C2A; color:var(--green); font-size:12px;
+    padding:0 12px; border-radius:8px; cursor:pointer; font-weight:600; flex-shrink:0;
+  }
+  .btn-outline:disabled { opacity:.4; cursor:not-allowed; }
+  .opts-list { background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-top:4px; max-height:180px; overflow:auto; }
+  .opt-item { padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border); }
+  .opt-item:hover { background:#0D1F12; }
+  .opt-item.selected { color:var(--green); }
+  .selected-tag { font-size:11px; color:var(--green-dim); margin-top:4px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+  .btn-primary {
+    display:block; width:100%; background:linear-gradient(135deg,var(--green),#00BFA5);
+    color:#001A09; font-weight:800; font-size:15px; padding:15px; border-radius:12px;
+    border:none; cursor:pointer; margin-top:20px; transition:opacity .2s, transform .1s; font-family:inherit;
+  }
+  .btn-primary:hover:not(:disabled) { opacity:.85; transform:translateY(-1px); }
+  .btn-primary:disabled { opacity:.4; cursor:not-allowed; }
+  .note {
+    background:#0B1A0F; border:1px dashed var(--border); border-radius:8px; padding:10px 14px;
+    font-size:12px; color:var(--text-dim); margin-top:14px; line-height:1.6;
+  }
+  .step-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; margin-bottom:8px; border:1px solid var(--border); background:var(--surface); }
+  .step-row.active { background:#0D1F12; }
+  .step-row.done { background:#0B2214; border-color:#1A5C2A; }
+  .step-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background:var(--text-muted); }
+  .step-dot.active { background:var(--amber); animation:pulse 1s ease-in-out infinite; }
+  .step-dot.done { background:var(--green); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .data-block { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .data-block-title { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px; }
+  .data-block-text { font-size:12px; color:var(--text-dim); line-height:1.65; max-height:130px; overflow:auto; white-space:pre-wrap; }
+  .prob-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px; }
+  .prob-box { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 10px; text-align:center; }
+  .prob-lbl { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; display:block; }
+  .prob-val { font-size:28px; font-weight:900; color:var(--green); line-height:1; }
+  .prob-bar { height:3px; background:var(--border); border-radius:2px; margin-top:8px; overflow:hidden; }
+  .prob-bar-fill { height:100%; background:var(--green); border-radius:2px; transition:width 1s ease; }
+  .score-box { background:#061209; border:1px solid #1A4A28; border-radius:10px; padding:16px; text-align:center; margin-bottom:20px; }
+  .score-val { font-size:34px; font-weight:900; letter-spacing:4px; }
+  .market-chip { display:inline-block; background:#0B2214; border:1px solid #1A5C2A; color:var(--green); font-size:12px; font-weight:600; padding:5px 12px; border-radius:20px; margin:0 6px 6px 0; }
+  .analysis-text { font-size:13px; line-height:1.75; color:var(--text-dim); white-space:pre-wrap; }
+  .section-title { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px; }
+  .conf-row { display:flex; align-items:center; gap:10px; margin-top:18px; padding-top:18px; border-top:1px solid var(--border); }
+  .conf-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .btn-sm { background:transparent; border:1px solid var(--border); color:var(--text-dim); font-size:11px; padding:6px 12px; border-radius:8px; cursor:pointer; font-family:inherit; }
+  .alert-card { background:#1A0A0A; border:1px solid #3D1515; border-radius:12px; padding:16px 20px; margin-top:20px; color:#FF7575; font-size:13px; }
+  ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background:var(--bg); } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="badge">⚽ Análise Esportiva · Dados Reais + IA</div>
+  <h1>Analisador de Partidas</h1>
+  <p class="sub">API-Football + Claude · temperature: 0 · Dados em tempo real</p>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <div class="card-head"><span style="font-size:18px">🎯</span><span class="card-head-title">Configurar Partida</span></div>
+    <div class="card-body">
+
+      <div class="teams-row">
+        <div>
+          <label class="field-label">🏠 Time A — Mandante</label>
+          <div class="search-row">
+            <input id="teamAName" placeholder="Nome do time...">
+            <button class="btn-outline" id="searchABtn">🔍</button>
+          </div>
+          <div id="teamAOpts"></div>
+          <div id="teamATag" class="selected-tag"></div>
+        </div>
+        <div class="vs-chip">VS</div>
+        <div>
+          <label class="field-label">✈️ Time B — Visitante</label>
+          <div class="search-row">
+            <input id="teamBName" placeholder="Nome do time...">
+            <button class="btn-outline" id="searchBBtn">🔍</button>
+          </div>
+          <div id="teamBOpts"></div>
+          <div id="teamBTag" class="selected-tag"></div>
+        </div>
+      </div>
+
+      <div id="searchErrorBox"></div>
+
+      <div class="form-row">
+        <div>
+          <label class="field-label">🏆 Competição</label>
+          <select id="competition">
+            <option value="">Selecionar (opcional)</option>
+            <option>Brasileirão Série A</option><option>Copa do Brasil</option>
+            <option>Copa Libertadores</option><option>Copa Sul-Americana</option>
+            <option>Premier League</option><option>La Liga</option>
+            <option>Serie A</option><option>Bundesliga</option><option>Ligue 1</option>
+            <option>UEFA Champions League</option><option>Copa do Mundo</option>
+            <option>Copa América</option><option>Eliminatórias</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">📝 Contexto extra</label>
+          <input id="extra" placeholder="Ex: Final, 2ª mão, altitude...">
+        </div>
+      </div>
+
+      <button class="btn-primary" id="runBtn" disabled>🔍 Buscar Dados Reais e Analisar</button>
+
+      <div class="note">💡 Clique em 🔍 ao lado do nome para buscar o time e selecionar o correto. Cada análise consome ~5 das suas 100 requisições/dia gratuitas da API-Football.</div>
+    </div>
+  </div>
+
+  <div id="progressCard" class="card" style="display:none">
+    <div class="card-head"><span style="font-size:18px">📡</span><span class="card-head-title" id="progressTitle">Coletando dados em tempo real...</span></div>
+    <div style="padding:14px 18px" id="stepsContainer"></div>
+  </div>
+
+  <div id="dataCard" class="card" style="display:none">
+    <div class="card-head"><span style="font-size:18px">📊</span><span class="card-head-title">Dados coletados via API-Football</span></div>
+    <div class="card-body" id="dataContainer"></div>
+  </div>
+
+  <div id="errorCard" style="display:none"></div>
+
+  <div id="resultCard" class="card" style="display:none">
+    <div class="card-head">
+      <span style="font-size:20px">🏆</span>
+      <div>
+        <div class="card-head-title" id="resultTitle"></div>
+        <div id="resultComp" style="font-size:11px;color:var(--text-dim);margin-top:2px"></div>
+      </div>
+    </div>
+    <div class="card-body" id="resultContainer"></div>
+  </div>
+
+</div>
+
+<script>
+const state = { teamAId:null, teamBId:null, teamAName:'', teamBName:'' };
+
+const $ = (id) => document.getElementById(id);
+
+function updateRunBtn() {
+  $('runBtn').disabled = !(state.teamAId && state.teamBId);
+}
+
+async function searchTeam(side) {
+  const nameInput = side === 'A' ? $('teamAName') : $('teamBName');
+  const name = nameInput.value.trim();
+  if (!name) return;
+  const btn = side === 'A' ? $('searchABtn') : $('searchBBtn');
+  const optsDiv = side === 'A' ? $('teamAOpts') : $('teamBOpts');
+  $('searchErrorBox').innerHTML = '';
+  btn.textContent = '⏳'; btn.disabled = true;
+  try {
+    const r = await fetch(`/api/team?name=${encodeURIComponent(name)}`);
+    const d = await r.json();
+    const times = d.times || [];
+    if (times.length === 0) {
+      $('searchErrorBox').innerHTML = `<div class="alert-card" style="margin-top:12px">⚠️ Nenhum time encontrado para "${name}". Tente outro nome.</div>`;
+    }
+    optsDiv.innerHTML = '';
+    if (times.length) {
+      const list = document.createElement('div');
+      list.className = 'opts-list';
+      times.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'opt-item';
+        item.textContent = `${t.nome} (${t.pais})`;
+        item.onclick = () => {
+          if (side === 'A') { state.teamAId = t.id; state.teamAName = t.nome; nameInput.value = t.nome; $('teamATag').textContent = `✓ ID: ${t.id} selecionado`; }
+          else { state.teamBId = t.id; state.teamBName = t.nome; nameInput.value = t.nome; $('teamBTag').textContent = `✓ ID: ${t.id} selecionado`; }
+          optsDiv.innerHTML = '';
+          updateRunBtn();
+        };
+        list.appendChild(item);
+      });
+      optsDiv.appendChild(list);
+    }
+  } catch (e) {
+    $('searchErrorBox').innerHTML = `<div class="alert-card" style="margin-top:12px">⚠️ Erro ao buscar "${name}": ${e.message}</div>`;
+  } finally {
+    btn.textContent = '🔍'; btn.disabled = false;
+  }
+}
+
+$('searchABtn').onclick = () => searchTeam('A');
+$('searchBBtn').onclick = () => searchTeam('B');
+$('teamAName').oninput = () => { state.teamAId = null; $('teamATag').textContent=''; updateRunBtn(); };
+$('teamBName').oninput = () => { state.teamBId = null; $('teamBTag').textContent=''; updateRunBtn(); };
+
+const STEP_DEFS = [
+  { id:'collect', label: () => `Coletando forma, H2H e lesionados` },
+  { id:'analysis', label: () => `Análise IA (temperature: 0)` },
+];
+
+function renderSteps(activeId, doneIds) {
+  $('stepsContainer').innerHTML = STEP_DEFS.map(s => {
+    const isDone = doneIds.includes(s.id);
+    const isActive = s.id === activeId;
+    const cls = isDone ? 'done' : isActive ? 'active' : '';
+    const dotCls = isDone ? 'done' : isActive ? 'active' : '';
+    return `<div class="step-row ${cls}"><div class="step-dot ${dotCls}"></div><span style="font-size:13px;font-weight:600;color:${isDone?'var(--text)':isActive?'var(--green)':'var(--text-dim)'}">${s.label()}</span>${isActive?'<span style="margin-left:auto;font-size:10px;color:var(--amber)">processando...</span>':''}${isDone?'<span style="margin-left:auto;font-size:10px;color:var(--green-dim)">✓</span>':''}</div>`;
+  }).join('');
+}
+
+function formatDataBlock(title, text) {
+  return `<div class="data-block"><div class="data-block-title">${title}</div><div class="data-block-text">${text}</div></div>`;
+}
+
+function renderResult(result, rawText, teamAName, teamBName, competition) {
+  $('resultTitle').textContent = `${teamAName} x ${teamBName}`;
+  $('resultComp').textContent = competition || '';
+
+  let html = '';
+
+  if (result.probA || result.probEmp || result.probB) {
+    html += `<div style="margin-bottom:20px"><div class="section-title">📊 Probabilidades</div><div class="prob-grid">`;
+    [[teamAName, result.probA], ['Empate', result.probEmp], [teamBName, result.probB]].forEach(([lbl,val]) => {
+      html += `<div class="prob-box"><span class="prob-lbl">${lbl}</span><div class="prob-val">${val?val+'%':'—'}</div><div class="prob-bar"><div class="prob-bar-fill" style="width:${val||0}%"></div></div></div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (result.placar) {
+    html += `<div style="margin-bottom:20px"><div class="section-title">⚽ Placar mais provável</div><div class="score-box"><div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Resultado esperado</div><div class="score-val">${result.placar}</div></div></div>`;
+  }
+
+  if (result.markets && result.markets.length) {
+    html += `<div style="margin-bottom:20px"><div class="section-title">📈 Mercados com maior valor</div>`;
+    result.markets.forEach(m => html += `<span class="market-chip">✓ ${m}</span>`);
+    html += `</div>`;
+  }
+
+  if (result.analysis) {
+    html += `<div style="margin-bottom:8px"><div class="section-title">🔎 Análise detalhada</div><div class="analysis-text">${result.analysis}</div></div>`;
+  } else if (rawText) {
+    html += `<div class="analysis-text">${rawText}</div>`;
+  }
+
+  if (result.confidence) {
+    const color = result.confidence === 'Alto' ? 'var(--green)' : result.confidence === 'Médio' ? 'var(--amber)' : 'var(--red)';
+    html += `<div class="conf-row"><div class="conf-dot" style="background:${color}"></div><span style="font-size:12px;color:var(--text-dim);font-weight:600">Grau de confiança: <strong style="color:var(--text)">${result.confidence}</strong></span><button class="btn-sm" id="newAnalysisBtn" style="margin-left:auto">Nova análise</button></div>`;
+  }
+
+  $('resultContainer').innerHTML = html;
+  const newBtn = document.getElementById('newAnalysisBtn');
+  if (newBtn) newBtn.onclick = resetUI;
+}
+
+function resetUI() {
+  $('progressCard').style.display = 'none';
+  $('dataCard').style.display = 'none';
+  $('resultCard').style.display = 'none';
+  $('errorCard').style.display = 'none';
+}
+
+$('runBtn').onclick = async () => {
+  if (!state.teamAId || !state.teamBId) return;
+  resetUI();
+  $('runBtn').disabled = true;
+  $('runBtn').textContent = '⏳ Buscando dados e analisando...';
+  $('progressCard').style.display = 'block';
+  $('progressTitle').textContent = 'Coletando dados em tempo real...';
+  renderSteps('collect', []);
+
+  const competition = $('competition').value;
+  const extra = $('extra').value;
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        teamAId: state.teamAId, teamBId: state.teamBId,
+        teamAName: state.teamAName, teamBName: state.teamBName,
+        competition, extra,
+      }),
+    });
+
+    renderSteps('analysis', ['collect']);
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `Erro ${res.status}`);
+    }
+
+    const data = await res.json();
+    renderSteps(null, ['collect', 'analysis']);
+    $('progressTitle').textContent = '✓ Concluído';
+
+    $('dataCard').style.display = 'block';
+    $('dataContainer').innerHTML =
+      formatDataBlock(`📋 ${state.teamAName}`, data.collected.formaA) +
+      formatDataBlock(`📋 ${state.teamBName}`, data.collected.formaB) +
+      formatDataBlock('🔁 H2H', data.collected.h2h) +
+      formatDataBlock('🏥 Lesionados', data.collected.injuries);
+
+    $('resultCard').style.display = 'block';
+    renderResult(data.result, data.rawText, state.teamAName, state.teamBName, competition);
+
+  } catch (e) {
+    $('progressCard').style.display = 'none';
+    $('errorCard').style.display = 'block';
+    $('errorCard').innerHTML = `<div class="alert-card">⚠️ ${e.message}</div>`;
+  } finally {
+    $('runBtn').disabled = false;
+    $('runBtn').textContent = '🔍 Buscar Dados Reais e Analisar';
+    updateRunBtn();
+  }
+};
+</script>
+</body>
+</html>
